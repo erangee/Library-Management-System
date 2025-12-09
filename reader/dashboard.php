@@ -364,8 +364,7 @@ try {
                             <div style="font-size: 0.8rem; color: var(--accent-secondary); margin-bottom: 10px;">
                                 <?php echo htmlspecialchars($book['category_name']); ?>
                             </div>
-                            <a href="#" class="btn-read">Read Now</a>
-                        </div>
+                <a href="read_book.php?id=<?php echo $book['ebook_id']; ?>" class="btn-read">Read Now</a>                        </div>
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
