@@ -2,7 +2,7 @@
 session_start();
 require_once 'config.php'; // Ensure this file exists and connects to ebook_db
 
-// 1. Redirect if already logged in
+// 1. Redirect if already logged in (This section handles redirection based on the current session role)
 if (isset($_SESSION['user_id'])) {
     switch ($_SESSION['role']) { // We store 'role_name' as 'role' in session
         case 'Admin':
@@ -40,19 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // 4. Verify User and Password
             if ($user && password_verify($password, $user['password_hash'])) {
                 
-                // 5. Check if account is active
+                // 4. Check if account is active
                 if ($user['is_active'] == 0) {
                     $error = "Your account has been deactivated. Please contact support.";
                 } else {
-                    // 6. Login Success: Set Session Variables
+                    // 5. Login Success: Set Session Variables
+                    // THIS IS THE KEY PART: It reads the role from the DB. 
+                    // If the admin changed it to 'Admin' in the DB, the next login will use that new role.
                     $_SESSION['user_id'] = $user['user_id'];
                     $_SESSION['full_name'] = $user['full_name'];
                     $_SESSION['role'] = $user['role_name']; // Stores: 'Admin', 'Publisher', or 'Reader'
 
-                    // 7. Redirect based on Role
+                    // 6. Redirect based on Role (The user will be redirected based on the new role from the DB)
                     switch ($user['role_name']) {
                         case 'Admin':
                             header("Location: admin/dashboard.php");

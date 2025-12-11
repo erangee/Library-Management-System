@@ -35,11 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$book_id]);
             $_SESSION['msg'] = "Book deleted successfully.";
         } 
+        elseif ($action == 'toggle_status') { // <<< මෙය එකතු කරන්න
+            // TOGGLE BOOK STATUS (Published/Blocked)
+            $status = $_POST['status']; // The new status (Published or Blocked)
+
+            $stmt = $pdo->prepare("UPDATE ebooks SET status=? WHERE ebook_id=?");
+            $stmt->execute([$status, $book_id]);
+            $_SESSION['msg'] = "Book status updated: The book is now **" . $status . "**.";
+        }
         elseif ($action == 'update') {
             // UPDATE BOOK STATUS
             $status = $_POST['status']; // Published, Draft, or Blocked
             
-            $stmt = $pdo->prepare("UPDATE ebooks SET status=? WHERE ebook_id=?");
+            $stmt = $pdo->prepare("UPDATE ebooks SET status=? WHERE ebook_id=?
+                // ... update code ...
+            ");
             $stmt->execute([$status, $book_id]);
             $_SESSION['msg'] = "Book status updated successfully.";
         }

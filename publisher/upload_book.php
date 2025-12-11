@@ -1,5 +1,6 @@
 <?php
 session_start();
+// Database සම්බන්ධතාවය
 require_once '../root/config.php';
 
 // 1. Security Check
@@ -8,91 +9,48 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Publisher') {
     exit();
 }
 
-$message = '';
-$error = '';
+$publisher_id = $_SESSION['user_id'];
+// Session එකෙන් messages සහ කලින් දැමූ form data ලබා ගැනීම
+$message = $_SESSION['msg'] ?? '';
+$error = $_SESSION['error'] ?? '';
+$form_data = $_SESSION['form_data'] ?? [];
 
-// 2. Fetch Categories for Dropdown
+// Messages සහ form data ලබා ගත් පසු, ඒවා session එකෙන් ඉවත් කිරීම
+unset($_SESSION['msg'], $_SESSION['error'], $_SESSION['form_data']); 
+
+
+// =================================================================
+// 2. ACTIVE STATUS CHECK for Publisher (Upload කිරීමට පෙර පරීක්ෂා කිරීම)
+// =================================================================
+try {
+    $stmt = $pdo->prepare("SELECT is_active FROM users WHERE user_id = ?");
+    $stmt->execute([$publisher_id]);
+    $is_active = $stmt->fetchColumn();
+
+    if ($is_active === '0') {
+        if (empty($error)) {
+             $error = "Your Publisher account is currently **INACTIVE** and under review. You cannot upload books until an Admin approves your account.";
+        }
+        $_SESSION['error'] = $error;
+        header("Location: dashboard.php"); 
+        exit();
+    }
+} catch (PDOException $e) {
+    $_SESSION['error'] = "A system error occurred during your account status check.";
+    header("Location: ../login.php");
+    exit();
+}
+// =================================================================
+
+
+// 3. FETCH CATEGORIES FOR DROPDOWN (මෙම කොටසින් Categories load කරයි)
 try {
     $catStmt = $pdo->query("SELECT * FROM categories ORDER BY category_name ASC");
     $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    $error = "Error fetching categories.";
-}
-
-// 3. Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $title = trim($_POST['title']);
-    $author = trim($_POST['author']);
-    $category_id = $_POST['category_id'];
-    $description = trim($_POST['description']);
-    $price = $_POST['price'];
-    $status = $_POST['status'];
-    $publisher_id = $_SESSION['user_id'];
-
-    // File Upload Logic
-    $coverDir = "../uploads/covers/";
-    $fileDir = "../uploads/files/";
-    
-    // Ensure directories exist
-    if (!file_exists($coverDir)) mkdir($coverDir, 0777, true);
-    if (!file_exists($fileDir)) mkdir($fileDir, 0777, true);
-
-    $uploadOk = true;
-
-    // A. Handle Cover Image
-    $coverName = basename($_FILES["cover_image"]["name"]);
-    $coverTarget = $coverDir . uniqid() . "_" . $coverName;
-    $imageFileType = strtolower(pathinfo($coverTarget, PATHINFO_EXTENSION));
-    
-    // B. Handle Book File (PDF/EPUB)
-    $fileName = basename($_FILES["book_file"]["name"]);
-    $fileTarget = $fileDir . uniqid() . "_" . $fileName;
-    $bookFileType = strtolower(pathinfo($fileTarget, PATHINFO_EXTENSION));
-
-    // Validations
-    if (empty($title) || empty($author) || empty($category_id) || empty($fileName)) {
-        $error = "Please fill in all required fields and upload a book file.";
-        $uploadOk = false;
-    } elseif (!in_array($imageFileType, ['jpg', 'png', 'jpeg', 'webp'])) {
-        $error = "Cover image must be JPG, PNG, or WEBP.";
-        $uploadOk = false;
-    } elseif (!in_array($bookFileType, ['pdf', 'epub'])) {
-        $error = "Book file must be PDF or EPUB.";
-        $uploadOk = false;
-    }
-
-    if ($uploadOk) {
-        if (move_uploaded_file($_FILES["cover_image"]["tmp_name"], $coverTarget) && 
-            move_uploaded_file($_FILES["book_file"]["tmp_name"], $fileTarget)) {
-            
-            try {
-                // Insert into Database
-                $sql = "INSERT INTO ebooks (publisher_id, category_id, title, author, description, cover_image_url, file_link, price, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $publisher_id, 
-                    $category_id, 
-                    $title, 
-                    $author, 
-                    $description, 
-                    $coverTarget, 
-                    $fileTarget, 
-                    $price, 
-                    $status
-                ]);
-
-                // Redirect to Dashboard on success
-                header("Location: dashboard.php");
-                exit();
-
-            } catch (PDOException $e) {
-                $error = "Database Error: " . $e->getMessage();
-            }
-        } else {
-            $error = "Sorry, there was an error uploading your files.";
-        }
-    }
+    // Categories load කිරීමට දෝෂයක් ආවොත්
+    $error = "Error fetching categories. Please ensure the 'categories' table exists in your database.";
+    $categories = [];
 }
 ?>
 
@@ -101,150 +59,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Book - Readify</title>
+    <title>Upload Book - Readify Publisher</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        :root {
-            --bg-primary: #0a0e27;
-            --bg-secondary: #151937;
-            --bg-card: #1a1f3a;
-            --accent-primary: #6366f1;
-            --accent-secondary: #8b5cf6;
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-muted: #64748b;
-            --danger: #ef4444;
-            --success: #10b981;
+        /* CSS Styles (පෙර ලබා දුන් style sheet එකම භාවිතා කළ හැක) */
+        body { font-family: 'Inter', sans-serif; background-color: #151937; color: #f8fafc; }
+        .container { max-width: 800px; margin: 40px auto; background: #1a1f3a; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
+        h2 { color: #6366f1; border-bottom: 2px solid #1a1f3a; padding-bottom: 10px; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #cbd5e1; }
+        input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px; border: 1px solid #333; background: #2a3048; color: #f8fafc; border-radius: 8px; box-sizing: border-box; }
+        textarea { resize: vertical; min-height: 100px; }
+        .btn-submit { background-color: #6366f1; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background-color 0.3s; }
+        .btn-submit:hover { background-color: #4f46e5; }
+        .file-upload-box { 
+            display: block; padding: 10px; border: 2px dashed #6366f1; border-radius: 8px; 
+            text-align: center; cursor: pointer; background: #2a3048; color: #cbd5e1; 
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            padding: 40px 20px;
-            display: flex;
-            justify-content: center;
-        }
-
-        .upload-container {
-            background: var(--bg-card);
-            max-width: 800px;
-            width: 100%;
-            padding: 40px;
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
-        }
-
-        h2 { margin-bottom: 30px; font-size: 1.8rem; }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .form-group { margin-bottom: 24px; }
-        .full-width { grid-column: span 2; }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        input[type="text"],
-        input[type="number"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--bg-secondary);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: var(--text-primary);
-            font-family: inherit;
-        }
-
-        textarea { height: 120px; resize: vertical; }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
-        .file-upload-box {
-            border: 2px dashed rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .file-upload-box:hover {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.05);
-        }
-
         input[type="file"] { display: none; }
-
-        .btn-submit {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
-        .btn-submit:hover { opacity: 0.9; transform: translateY(-2px); }
-
-        .back-link {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            color: var(--text-muted);
-            text-decoration: none;
-        }
-        
-        .alert {
-            padding: 15px;
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
+        .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 600; }
+        .alert-success { background-color: #10b981; color: #064e3b; }
+        .alert-error { background-color: #ef4444; color: #7f1d1d; }
+        .back-link { display: inline-block; margin-top: 20px; color: #6366f1; text-decoration: none; }
     </style>
 </head>
 <body>
-
-    <div class="upload-container">
-        <h2>📤 Upload New Book</h2>
-
+    <div class="container">
+        <h2>Upload New Ebook</h2>
+        
         <?php if ($error): ?>
-            <div class="alert"><?php echo $error; ?></div>
+            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        
+        <?php if ($message): ?>
+            <div class="alert alert-success"><?php echo $message; ?></div>
         <?php endif; ?>
 
-        <form action="" method="POST" enctype="multipart/form-data">
+        <form method="POST" action="upload_book_backend.php" enctype="multipart/form-data">
             <div class="form-grid">
-                <div class="form-group">
+                <div class="form-group full-width">
                     <label>Book Title *</label>
-                    <input type="text" name="title" required placeholder="e.g. The Cosmic Journey">
+                    <input type="text" name="title" value="<?php echo htmlspecialchars($form_data['title'] ?? ''); ?>" required>
                 </div>
-
+                
                 <div class="form-group">
                     <label>Author Name *</label>
-                    <input type="text" name="author" required placeholder="e.g. John Doe">
+                    <input type="text" name="author" value="<?php echo htmlspecialchars($form_data['author'] ?? ''); ?>" required>
                 </div>
 
                 <div class="form-group">
@@ -252,29 +113,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <select name="category_id" required>
                         <option value="">Select Category</option>
                         <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo $cat['category_id']; ?>">
+                            <option value="<?php echo htmlspecialchars($cat['category_id']); ?>"
+                                <?php echo (isset($form_data['category_id']) && $form_data['category_id'] == $cat['category_id']) ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($cat['category_name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label>Price (USD) - 0 for Free</label>
-                    <input type="number" name="price" step="0.01" min="0" value="0.00" required>
-                </div>
-
                 <div class="form-group full-width">
-                    <label>Description</label>
-                    <textarea name="description" placeholder="What is this book about?"></textarea>
+                    <label>Description *</label>
+                    <textarea name="description" required><?php echo htmlspecialchars($form_data['description'] ?? ''); ?></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Price (LKR) *</label>
+                    <input type="number" name="price" step="0.01" min="0" value="<?php echo htmlspecialchars($form_data['price'] ?? '0.00'); ?>" required>
                 </div>
 
                 <div class="form-group">
                     <label>Cover Image (JPG/PNG) *</label>
                     <label for="cover_image" class="file-upload-box">
-                        <span id="cover-text">Click to Select Image</span>
+                        <span id="cover-text">Click to Select Cover Image</span>
                     </label>
-                    <input type="file" id="cover_image" name="cover_image" accept="image/*" required onchange="updateFileName('cover_image', 'cover-text')">
+                    <input type="file" id="cover_image" name="cover_image" accept="image/jpeg,image/png" required onchange="updateFileName('cover_image', 'cover-text')">
                 </div>
 
                 <div class="form-group">
@@ -285,11 +147,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="file" id="book_file" name="book_file" accept=".pdf,.epub" required onchange="updateFileName('book_file', 'file-text')">
                 </div>
 
-                <div class="form-group full-width">
+                <div class="form-group">
                     <label>Visibility</label>
                     <select name="status">
-                        <option value="Published">Publish Immediately</option>
-                        <option value="Draft">Save as Draft</option>
+                        <option value="Published" <?php echo (isset($form_data['status']) && $form_data['status'] == 'Published') ? 'selected' : ''; ?>>Publish Immediately</option>
+                        <option value="Draft" <?php echo (isset($form_data['status']) && $form_data['status'] == 'Draft') ? 'selected' : ''; ?>>Save as Draft</option>
                     </select>
                 </div>
             </div>
@@ -306,7 +168,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const span = document.getElementById(spanId);
             if (input.files && input.files[0]) {
                 span.innerText = "✅ " + input.files[0].name;
-                span.style.color = "var(--success)";
+                span.style.color = "#10b981"; // Success color
+            } else {
+                span.innerText = (inputId === 'cover_image') ? 'Click to Select Cover Image' : 'Click to Select PDF/EPUB';
+                span.style.color = "#cbd5e1"; // Default color
             }
         }
     </script>

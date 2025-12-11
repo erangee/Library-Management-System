@@ -43,22 +43,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $age = $today->diff($dobDate)->y;
     }
 
-    // 2. Validate input
-    if (empty($role) || empty($full_name) || empty($email) || empty($password) || empty($dob)) {
+    // 2. Simple Validation
+    if ($role !== 'Reader' && $role !== 'Publisher') {
+        $error = "Invalid role selection.";
+    } elseif (empty($full_name) || empty($email) || empty($password) || empty($confirm_password) || empty($dob)) {
         $error = "All required fields must be filled.";
-    } elseif (!in_array($role, ['Reader', 'Publisher'])) {
-        $error = "Invalid role selected.";
-    } elseif ($age < 5) {
-        $error = "Please enter a valid date of birth."; 
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Invalid email format.";
     } elseif (strlen($password) < 8) {
         $error = "Password must be at least 8 characters long.";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
-    } else {
+    } elseif ($age < 18) {
+        // You can adjust age requirements as needed
+        $error = "You must be at least 18 years old to register.";
+    }
+
+    if (empty($error)) {
         try {
-            // 3. Check if email already exists
+            // Check if email already exists
             $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
             $stmt->execute([$email]);
             
@@ -69,6 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
                 
                 // 5. Insert into 'users' table
+                $is_active_status = ($role === 'Publisher') ? 0 : 1; // <--- ප්‍රධාන වෙනස්කම: Publisher නම් 0, Reader නම් 1.
+
                 $stmt = $pdo->prepare("
                     INSERT INTO users (
                         role_name, 
@@ -81,12 +86,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         is_verified, 
                         created_at
                     ) VALUES (
-                        ?, ?, ?, ?, ?, ?, 1, 0, NOW()
+                        ?, ?, ?, ?, ?, ?, ?, 0, NOW()
                     )
                 ");
                 
-                if ($stmt->execute([$role, $email, $password_hash, $full_name, $dob, $bio])) {
-                    $success = "         Registration successful !";
+                if ($stmt->execute([$role, $email, $password_hash, $full_name, $dob, $bio, $is_active_status])) {
+                    // Success message depends on role
+                    if ($role === 'Publisher') {
+                         $success = "Registration successful! Your Publisher account is now **under review**. You will be notified once an Admin activates it.";
+                    } else {
+                         $success = "Registration successful! You can now log in.";
+                    }
+                   
                 } else {
                     $error = "Could not register user. Please try again.";
                 }

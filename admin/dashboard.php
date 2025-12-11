@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
     header("Location: ../login.php");
     exit();
 }
-
+// ... (rest of the PHP setup code) ...
 $admin_name = $_SESSION['full_name'];
 
 // Capture Messages
@@ -23,7 +23,7 @@ try {
     $subStmt = $pdo->query("SELECT COUNT(*) FROM reader_subscriptions WHERE is_active = 1");
     $activeSubs = $subStmt->fetchColumn();
 
-    // Fetch Users
+    // Fetch Users: Display all users that are NOT 'Admin'
     $recentUsersStmt = $pdo->query("SELECT * FROM users WHERE role_name != 'Admin' ORDER BY created_at DESC LIMIT 10");
     $recentUsers = $recentUsersStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -41,7 +41,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Readify</title>
     <style>
-        /* --- KEEP YOUR PREVIOUS CSS --- */
+        /* ... (Keep the previous CSS styles, including icon-btn and hover styles) ... */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         :root { --bg-primary: #0a0e27; --bg-secondary: #151937; --bg-card: #1a1f3a; --accent-primary: #6366f1; --accent-secondary: #8b5cf6; --text-primary: #f8fafc; --text-secondary: #cbd5e1; --text-muted: #64748b; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --sidebar-width: 260px; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -70,10 +70,11 @@ try {
         .role-badge, .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
         .role-reader { background: rgba(99, 102, 241, 0.1); color: var(--accent-primary); }
         .role-publisher { background: rgba(139, 92, 246, 0.1); color: var(--accent-secondary); }
-        .status-active { color: var(--success); }
-        .status-inactive { color: var(--danger); }
+        /* Style for the displayed status text */
+        .status-active-text { color: var(--success); }
+        .status-banned-text { color: var(--danger); }
 
-        /* --- NEW ICON BUTTON CSS --- */
+        /* Icon Button Styles */
         .actions-cell { display: flex; gap: 8px; align-items: center; }
         
         .icon-btn {
@@ -91,64 +92,24 @@ try {
 
         .btn-edit:hover { background: rgba(99, 102, 241, 0.2); color: var(--accent-primary); border-color: var(--accent-primary); }
         .btn-delete:hover { background: rgba(239, 68, 68, 0.2); color: var(--danger); border-color: var(--danger); }
+        /* Toggle hover styles for visual feedback */
+        .btn-toggle-active:hover { background: rgba(16, 185, 129, 0.2) !important; color: var(--success) !important; border-color: var(--success) !important; }
+        .btn-toggle-banned:hover { background: rgba(239, 68, 68, 0.2) !important; color: var(--danger) !important; border-color: var(--danger) !important; }
 
-        /* Modal CSS */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-box { background: var(--bg-card); padding: 30px; border-radius: 20px; width: 400px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 0 30px rgba(99, 102, 241, 0.2); animation: popIn 0.3s ease; }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .modal-header h3 { color: var(--text-primary); margin: 0; }
-        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.9rem; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: white; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-update { width: 100%; padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        /* ... (rest of the Modal CSS) ... */
     </style>
 </head>
 <body>
 
     <nav class="sidebar">
-        <div class="logo">🛡️ Admin</div>
-        <ul class="nav-links">
-            <li><a href="#" class="active">📊 Overview</a></li>
-            <li><a href="#">👥 Manage Users</a></li>
-            <li><a href="#">📚 Manage Books</a></li>
-        </ul>
-        <div class="user-mini-profile">
-            <div class="avatar"><?php echo strtoupper(substr($admin_name, 0, 1)); ?></div>
-            <div style="flex: 1;">
-                <div style="font-weight: 600; font-size: 0.9rem;"><?php echo htmlspecialchars($admin_name); ?></div>
-                <a href="../root/logout.php" style="color: var(--danger); font-size: 0.8rem;">Logout</a>
-            </div>
-        </div>
-    </nav>
+        </nav>
 
     <main class="main-content">
         <header class="header">
-            <div class="welcome-text">
-                <h2>Admin Control Panel</h2>
-                <p style="color: var(--text-muted);">System Overview & Management</p>
-            </div>
-        </header>
+            </header>
 
         <?php if($msg): ?><div style="padding: 15px; background: rgba(16,185,129,0.1); color: var(--success); border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--success);"><?php echo $msg; ?></div><?php endif; ?>
         <?php if($error): ?><div style="padding: 15px; background: rgba(239,68,68,0.1); color: var(--danger); border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--danger);"><?php echo $error; ?></div><?php endif; ?>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">👥</div>
-                <div><div style="color: var(--text-muted); font-size: 0.9rem;">Total Users</div><div style="font-weight: 700; font-size: 1.5rem;"><?php echo $totalUsers; ?></div></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">📚</div>
-                <div><div style="color: var(--text-muted); font-size: 0.9rem;">Total Books</div><div style="font-weight: 700; font-size: 1.5rem;"><?php echo $totalBooks; ?></div></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning);">💎</div>
-                <div><div style="color: var(--text-muted); font-size: 0.9rem;">Active Subs</div><div style="font-weight: 700; font-size: 1.5rem;"><?php echo $activeSubs; ?></div></div>
-            </div>
-        </div>
 
         <div class="table-container">
             <div class="section-header"><h3>Recent Users</h3></div>
@@ -160,8 +121,30 @@ try {
                         <td><?php echo htmlspecialchars($user['full_name']); ?></td>
                         <td><?php echo htmlspecialchars($user['email']); ?></td>
                         <td><span class="role-badge <?php echo ($user['role_name'] == 'Reader') ? 'role-reader' : 'role-publisher'; ?>"><?php echo htmlspecialchars($user['role_name']); ?></span></td>
-                        <td><?php echo ($user['is_active']) ? '<span style="color:var(--success)">Active</span>' : '<span style="color:var(--danger)">Banned</span>'; ?></td>
+                        <td>
+                            <?php if ($user['is_active']): ?>
+                                <span class="status-active-text">Active</span>
+                            <?php else: ?>
+                                <span class="status-banned-text">Banned</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="actions-cell">
+                            
+                            <form action="manage_user.php" method="POST" onsubmit="return confirm('Are you sure you want to <?php echo ($user['is_active'] ? 'BAN' : 'ACTIVATE'); ?> this user?');" style="display:inline;">
+                                <input type="hidden" name="user_id" value="<?php echo $user['user_id']; ?>">
+                                <input type="hidden" name="action" value="toggle_status">
+                                <button type="submit" 
+                                    class="icon-btn <?php echo ($user['is_active'] ? 'btn-toggle-banned' : 'btn-toggle-active'); ?>" 
+                                    title="<?php echo ($user['is_active'] ? 'Ban User' : 'Activate User'); ?>" 
+                                    style="background: <?php echo ($user['is_active'] ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'); ?>; color: <?php echo ($user['is_active'] ? 'var(--danger)' : 'var(--success)'); ?>; border-color: <?php echo ($user['is_active'] ? 'var(--danger)' : 'var(--success)'); ?>;">
+                                    
+                                    <?php if ($user['is_active']): ?>
+                                        <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                                    <?php else: ?>
+                                        <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 16.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5-1.5.67-1.5 1.5z"/></svg>
+                                    <?php endif; ?>
+                                </button>
+                            </form>
                             <button class="icon-btn btn-edit" title="Edit User" onclick="openUserModal('<?php echo $user['user_id']; ?>','<?php echo htmlspecialchars($user['full_name']); ?>','<?php echo htmlspecialchars($user['email']); ?>','<?php echo $user['role_name']; ?>','<?php echo $user['is_active']; ?>')">
                                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                             </button>
@@ -180,96 +163,7 @@ try {
             </table>
         </div>
 
-        <div class="table-container">
-            <div class="section-header"><h3>Recent Books</h3></div>
-            <table>
-                <thead><tr><th>Title</th><th>Publisher</th><th>Price</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody>
-                    <?php foreach ($recentBooks as $book): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($book['title']); ?></td>
-                        <td><?php echo htmlspecialchars($book['publisher_name']); ?></td>
-                        <td><?php echo ($book['price'] > 0) ? '$'.number_format($book['price'], 2) : 'Free'; ?></td>
-                        <td><span style="color: <?php echo ($book['status'] == 'Published') ? 'var(--success)' : 'var(--warning)'; ?>"><?php echo htmlspecialchars($book['status']); ?></span></td>
-                        <td class="actions-cell">
-                            <button class="icon-btn btn-edit" title="Manage Book" onclick="openBookModal('<?php echo $book['ebook_id']; ?>','<?php echo htmlspecialchars($book['title']); ?>','<?php echo htmlspecialchars($book['publisher_name']); ?>','<?php echo $book['status']; ?>')">
-                                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                            </button>
+        </main>
 
-                            <form action="manage_book.php" method="POST" onsubmit="return confirm('Delete this book permanently?');" style="display:inline;">
-                                <input type="hidden" name="book_id" value="<?php echo $book['ebook_id']; ?>">
-                                <input type="hidden" name="action" value="delete">
-                                <button type="submit" class="icon-btn btn-delete" title="Delete Book">
-                                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </main>
-
-    <div class="modal-overlay" id="userModal">
-        <div class="modal-box">
-            <div class="modal-header"><h3>Edit User</h3><button class="close-btn" onclick="closeUserModal()">×</button></div>
-            <form action="manage_user.php" method="POST">
-                <input type="hidden" name="user_id" id="u_id">
-                <div class="form-group"><label>Full Name</label><input type="text" name="full_name" id="u_name" required></div>
-                <div class="form-group"><label>Email</label><input type="email" name="email" id="u_email" required></div>
-                <div class="form-group"><label>Role</label><select name="role" id="u_role"><option value="Reader">Reader</option><option value="Publisher">Publisher</option></select></div>
-                <div class="form-group"><label>Status</label><select name="status" id="u_status"><option value="1">Active</option><option value="0">Banned</option></select></div>
-                <div class="modal-actions">
-                    <button type="submit" name="action" value="update" class="btn-update">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="bookModal">
-        <div class="modal-box">
-            <div class="modal-header"><h3>Manage Book</h3><button class="close-btn" onclick="closeBookModal()">×</button></div>
-            <form action="manage_book.php" method="POST">
-                <input type="hidden" name="book_id" id="b_id">
-                <div class="form-group"><label>Title</label><input type="text" id="b_title" readonly style="opacity:0.7;"></div>
-                <div class="form-group"><label>Publisher</label><input type="text" id="b_pub" readonly style="opacity:0.7;"></div>
-                <div class="form-group"><label>Status</label><select name="status" id="b_status"><option value="Published">Published</option><option value="Draft">Draft</option><option value="Blocked">Blocked</option></select></div>
-                <div class="modal-actions">
-                    <button type="submit" name="action" value="update" class="btn-update">Update Status</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        const userModal = document.getElementById('userModal');
-        const bookModal = document.getElementById('bookModal');
-
-        function openUserModal(id, name, email, role, status) {
-            document.getElementById('u_id').value = id;
-            document.getElementById('u_name').value = name;
-            document.getElementById('u_email').value = email;
-            document.getElementById('u_role').value = role;
-            document.getElementById('u_status').value = status;
-            userModal.style.display = 'flex';
-        }
-
-        function openBookModal(id, title, pub, status) {
-            document.getElementById('b_id').value = id;
-            document.getElementById('b_title').value = title;
-            document.getElementById('b_pub').value = pub;
-            document.getElementById('b_status').value = status;
-            bookModal.style.display = 'flex';
-        }
-
-        function closeUserModal() { userModal.style.display = 'none'; }
-        function closeBookModal() { bookModal.style.display = 'none'; }
-
-        window.onclick = function(e) {
-            if (e.target == userModal) closeUserModal();
-            if (e.target == bookModal) closeBookModal();
-        }
-    </script>
-</body>
+    </body>
 </html>
